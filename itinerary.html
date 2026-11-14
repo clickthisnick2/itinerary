@@ -3,16 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; base-uri 'self'; form-action 'self'; object-src 'none'">
   <meta name="description" content="Work backward from an event and see when you need to start getting ready.">
   <title>Itinerary</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.5' fill='none' stroke='%232FA4E7' stroke-width='1.5'/%3E%3Cpath d='M8 4.5V8l2.5 1.5' fill='none' stroke='%232FA4E7' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/ceruleanBootswatch.min.css">
-  <style>
-    .itinerary-actions .btn { margin: 0 0.5rem 0.5rem 0; }
-    caption { caption-side: top; text-align: left; }
-    #clock { font-variant-numeric: tabular-nums; }
-    #status:empty { display: none; }
-  </style>
+  <link rel="stylesheet" href="assets/itinerary.css">
 </head>
 <body>
   <main id="planner" class="container" data-testid="planner">
@@ -25,12 +21,14 @@
       <div class="row">
         <div class="col-sm-6 form-group">
           <label id="name-label" for="event-name">What is your event?</label>
-          <input id="event-name" data-testid="event-name" class="form-control" name="name" type="text" autocomplete="off" spellcheck="true" placeholder="Dinner" aria-required="true">
+          <input id="event-name" data-testid="event-name" class="form-control" name="name" type="text" autocomplete="off" spellcheck="true" placeholder="Dinner" aria-required="true" aria-invalid="false" data-error="name-error">
+          <p id="name-error" class="field-error" data-testid="name-error"></p>
         </div>
         <div class="col-sm-6 form-group">
           <label id="time-label" for="event-time">When is your event?</label>
-          <input id="event-time" data-testid="event-time" class="form-control" name="time" type="text" autocomplete="off" spellcheck="false" placeholder="7:00 PM" aria-required="true" aria-describedby="time-hint">
+          <input id="event-time" data-testid="event-time" class="form-control" name="time" type="text" autocomplete="off" spellcheck="false" placeholder="7:00 PM" aria-required="true" aria-invalid="false" aria-describedby="time-hint" data-error="time-error">
           <p id="time-hint" class="help-block" data-testid="time-hint">Example: 7:00 PM, 7pm, or 19:00.</p>
+          <p id="time-error" class="field-error" data-testid="time-error"></p>
         </div>
       </div>
       <div class="form-group itinerary-actions">

@@ -44,6 +44,12 @@ describe("planner page", function () {
     assert.match(html, /<label[^>]+for="event-name"/);
     assert.match(html, /<label[^>]+for="event-time"/);
     assert.match(html, /aria-live="polite"/);
+    assert.match(html, /aria-invalid="false"/);
+    assert.match(html, /data-error="name-error"/);
+    assert.match(html, /Content-Security-Policy/);
+    assert.match(html, /script-src 'self'/);
+    assert.match(html, /assets\/itinerary.css/);
+    assert.doesNotMatch(html, /<style>/);
     assert.match(html, /<script src="itinerary.js"><\/script>/);
     assert.doesNotMatch(html, /onclick=/);
     assert.equal((html.match(/<form/g) || []).length, 1);
@@ -52,6 +58,12 @@ describe("planner page", function () {
   it("keeps untrusted names out of HTML strings", function () {
     assert.doesNotMatch(script, /innerHTML/);
     assert.doesNotMatch(script, /alert\(/);
+    assert.doesNotMatch(script, /navigator\.modelContext/);
+    assert.doesNotMatch(script, /unregisterTool/);
+    assert.match(script, /modelContext/);
+    assert.match(script, /registerTool/);
+    assert.match(script, /readOnlyHint: true/);
+    assert.match(script, /:user-invalid/);
     assert.doesNotMatch(script, /ko\.observable/);
     assert.doesNotMatch(script, /moment\(/);
     assert.match(script, /textContent/);

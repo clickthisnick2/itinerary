@@ -511,6 +511,223 @@
     return { model: model, errors: errors };
   }
 
+  function scheduleSnapshot(model, message) {
+    return {
+      message: message,
+      summary: startSummary(model),
+      event: model.eventName,
+      rows: buildRows(model).map(function (row) {
+        return {
+          index: row.index,
+          kind: row.kind,
+          name: row.name,
+          start: row.startLabel,
+          minutes: row.duration,
+        };
+      }),
+    };
+  }
+
+  function toolCancelled(options) {
+    var signal = options && options.signal;
+    if (signal && signal.aborted) {
+      throw new DOMException("The tool was cancelled.", "AbortError");
+    }
+  }
+
+  function createPlannerTools(model, hooks) {
+    function publish(result) {
+      if (hooks && hooks.onChange) {
+        hooks.onChange(result);
+      }
+      if (!result.ok) {
+        return { error: result.message };
+      }
+      return scheduleSnapshot(model, result.message);
+    }
+
+    return [
+      {
+        name: "add-event",
+        description:
+          "Saves the event the schedule works backward from. Use when the user names an event and when it starts.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "What the event is called." },
+            time: {
+              type: "string",
+              description: "When the event starts, such as 7:00 PM or 19:00.",
+            },
+          },
+          required: ["name", "time"],
+        },
+        execute: function (input, options) {
+          toolCancelled(options);
+          if (!input || typeof input.name !== "string" || typeof input.time !== "string") {
+            return { error: "Pass the event name and a clock time, such as 7:00 PM." };
+          }
+          return publish(addEvent(model, input.name, input.time));
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+      },
+      {
+        name: "add-step",
+        description:
+          "Adds one preparation step in the order it will be done. Use after an event is saved.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "What to do during this step." },
+            minutes: {
+              type: "integer",
+              minimum: 1,
+              maximum: 1440,
+              description: "How long the step takes.",
+            },
+          },
+          required: ["name", "minutes"],
+        },
+        execute: function (input, options) {
+          toolCancelled(options);
+          if (model.eventMinutes == null) {
+            return { error: "Add the event before adding a step." };
+          }
+          if (!input || typeof input.name !== "string") {
+            return { error: "Pass the step name and how many minutes it takes." };
+          }
+          var duration =
+            typeof input.minutes === "number" && Number.isInteger(input.minutes)
+              ? parseDuration(String(input.minutes))
+              : typeof input.minutes === "string"
+                ? parseDuration(input.minutes)
+                : { ok: false, message: "Pass how many minutes the step takes, such as 15." };
+          if (!duration.ok) {
+            return { error: duration.message };
+          }
+          return publish(addStep(model, input.name, String(duration.minutes)));
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+      },
+      {
+        name: "move-step",
+        description: "Moves a preparation step earlier or later in the order it will be done.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            index: {
+              type: "integer",
+              minimum: 0,
+              description: "Which preparation step to move, counting from the first step.",
+            },
+            direction: {
+              type: "string",
+              enum: ["up", "down"],
+              description: "Which way to move that step in the order it is done.",
+            },
+          },
+          required: ["index", "direction"],
+        },
+        execute: function (input, options) {
+          toolCancelled(options);
+          if (!input || typeof input.index !== "number" || !Number.isInteger(input.index)) {
+            return { error: "Pass which step to move, counting from the first step." };
+          }
+          if (input.direction !== "up" && input.direction !== "down") {
+            return { error: "Pass which way to move the step." };
+          }
+          var previous = model.action;
+          model.action = input.direction;
+          var result = applyAction(model, input.index);
+          model.action = previous;
+          return publish(result);
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+      },
+      {
+        name: "remove-step",
+        description: "Removes one preparation step and recalculates the start times.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            index: {
+              type: "integer",
+              minimum: 0,
+              description: "Which preparation step to remove, counting from the first step.",
+            },
+          },
+          required: ["index"],
+        },
+        execute: function (input, options) {
+          toolCancelled(options);
+          if (!input || typeof input.index !== "number" || !Number.isInteger(input.index)) {
+            return { error: "Pass which step to remove, counting from the first step." };
+          }
+          if (input.index < 0 || input.index >= model.steps.length) {
+            return {
+              error: "That step is not in the list. There are " + model.steps.length + " steps.",
+            };
+          }
+          var previous = model.action;
+          model.action = "remove";
+          var result = removeAt(model, input.index);
+          model.action = previous;
+          return publish(result);
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+      },
+      {
+        name: "remove-event",
+        description: "Clears the event and leaves the steps in place so a new time can be set.",
+        inputSchema: { type: "object", properties: {} },
+        execute: function (input, options) {
+          toolCancelled(options);
+          if (model.eventMinutes == null) {
+            return { error: "There is no event to clear." };
+          }
+          var previous = model.action;
+          model.action = "remove";
+          var result = removeAt(model, model.steps.length);
+          model.action = previous;
+          return publish(result);
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+      },
+      {
+        name: "get-schedule",
+        description: "Returns the current event, steps, and the time to start getting ready.",
+        inputSchema: { type: "object", properties: {} },
+        execute: function (input, options) {
+          toolCancelled(options);
+          return scheduleSnapshot(model, startSummary(model));
+        },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+      },
+    ];
+  }
+
+  function registerPlannerTools(doc, model, hooks) {
+    try {
+      if (!doc || !doc.modelContext || typeof doc.modelContext.registerTool !== "function") {
+        return;
+      }
+      var controller = new AbortController();
+      createPlannerTools(model, hooks).forEach(function (tool) {
+        Promise.resolve(
+          doc.modelContext.registerTool(tool, { signal: controller.signal })
+        ).catch(function () {});
+      });
+      var view = doc.defaultView;
+      if (view) {
+        view.addEventListener("pagehide", function () {
+          controller.abort();
+        });
+      }
+    } catch (error) {
+      return;
+    }
+  }
+
   function element(doc, tag, options) {
     var node = doc.createElement(tag);
     if (options.className) {
@@ -590,9 +807,70 @@
       status.className = kind === "error" ? "alert alert-warning" : "alert alert-info";
     }
 
+    function linkError(input, shown) {
+      var errorId = input.getAttribute("data-error");
+      if (!errorId) {
+        return;
+      }
+      var ids = (input.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter(function (id) {
+          return id && id !== errorId;
+        });
+      if (shown) {
+        ids.push(errorId);
+      }
+      if (ids.length) {
+        input.setAttribute("aria-describedby", ids.join(" "));
+      } else {
+        input.removeAttribute("aria-describedby");
+      }
+    }
+
+    function errorElement(input) {
+      var errorId = input.getAttribute("data-error");
+      return errorId ? doc.getElementById(errorId) : null;
+    }
+
+    function clearField(input) {
+      input.setCustomValidity("");
+      var errorEl = errorElement(input);
+      if (errorEl) {
+        errorEl.textContent = "";
+      }
+      input.setAttribute("aria-invalid", "false");
+      linkError(input, false);
+    }
+
+    function markField(input, message) {
+      input.setCustomValidity(message);
+      var errorEl = errorElement(input);
+      if (errorEl) {
+        errorEl.textContent = message;
+      }
+      var invalid = input.matches(":user-invalid") || input.validationMessage !== "";
+      input.setAttribute("aria-invalid", invalid ? "true" : "false");
+      linkError(input, invalid);
+    }
+
+    function syncField(input) {
+      if (!input.matches || !input.matches("input")) {
+        return;
+      }
+      var invalid = input.matches(":user-invalid");
+      input.setAttribute("aria-invalid", invalid ? "true" : "false");
+      linkError(input, invalid);
+      if (!invalid) {
+        var errorEl = errorElement(input);
+        if (errorEl && input.validationMessage === "") {
+          errorEl.textContent = "";
+        }
+      }
+    }
+
     function clearInvalid() {
-      nameInput.removeAttribute("aria-invalid");
-      timeInput.removeAttribute("aria-invalid");
+      clearField(nameInput);
+      clearField(timeInput);
     }
 
     function showResult(result) {
@@ -600,7 +878,7 @@
       setStatus(result.message, result.ok ? "info" : "error");
       if (!result.ok && result.field) {
         var input = result.field === "name" ? nameInput : timeInput;
-        input.setAttribute("aria-invalid", "true");
+        markField(input, result.message);
         input.focus();
       }
     }
@@ -741,6 +1019,21 @@
       }
     }
 
+    [nameInput, timeInput].forEach(function (input) {
+      input.addEventListener("input", function () {
+        input.setCustomValidity("");
+        syncField(input);
+      });
+      input.addEventListener("blur", function () {
+        syncField(input);
+      });
+    });
+
+    addButton.addEventListener("click", function () {
+      nameInput.setCustomValidity("");
+      timeInput.setCustomValidity("");
+    });
+
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       var result = addEntry(model, nameInput.value, timeInput.value);
@@ -790,6 +1083,18 @@
     tick();
     doc.defaultView.setInterval(tick, 1000);
 
+    registerPlannerTools(doc, model, {
+      onChange: function (result) {
+        render();
+        if (result.ok) {
+          nameInput.value = "";
+          timeInput.value = "";
+          syncUrl();
+        }
+        showResult(result);
+      },
+    });
+
     render();
     if (doc.location && doc.location.search && doc.location.search !== "?") {
       var suffix = loaded.errors.length ? " " + loaded.errors.join(" ") : "";
@@ -821,6 +1126,7 @@
     cycleAction: cycleAction,
     modelToQuery: modelToQuery,
     modelFromQuery: modelFromQuery,
+    createPlannerTools: createPlannerTools,
     mount: mount,
   };
 });

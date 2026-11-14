@@ -1,0 +1,41 @@
+:root {
+  color-scheme: light;
+}
+
+.itinerary-actions .btn {
+  margin: 0 0.5rem 0.5rem 0;
+}
+
+caption {
+  caption-side: top;
+  text-align: left;
+}
+
+#clock {
+  font-variant-numeric: tabular-nums;
+}
+
+#status:empty {
+  display: none;
+}
+
+.field-error {
+  display: none;
+  color: #ff0039;
+}
+
+.form-control:user-invalid,
+.form-control[aria-invalid="true"] {
+  border-color: #ff0039;
+}
+
+.form-control:user-invalid ~ .field-error:not(:empty),
+.form-control[aria-invalid="true"] ~ .field-error:not(:empty) {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}

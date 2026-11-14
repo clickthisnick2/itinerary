@@ -34,6 +34,17 @@ Durations are whole minutes from 1 to 1440, with an optional unit such as `15` o
 
 `#change-action` cycles the row action: Remove, Move down, Move up. Its visible text is "Row action: Remove" (or the current action). Each schedule row has a button `#row-action-0`, `#row-action-1`, and so on. Move up is unavailable on the first step. Move down is unavailable on the last step. The event stays at the end; in Remove mode its button removes the event and keeps the steps.
 
+## Agent tools
+
+In Chromium 146 and newer with WebMCP enabled, the page registers tools on `document.modelContext`. Other browsers ignore them. The same actions remain on the form and the row buttons.
+
+- `add-event` saves the event name and clock time.
+- `add-step` adds one step and how many minutes it takes, in the order it will be done.
+- `move-step` moves a step earlier (`up`) or later (`down`).
+- `remove-step` removes one step.
+- `remove-event` clears the event and keeps the steps.
+- `get-schedule` reads the schedule and does not change it.
+
 ## Share
 
 The address bar updates as the plan changes. `#copy-link` copies that URL. Query parameters:

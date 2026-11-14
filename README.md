@@ -25,7 +25,7 @@ Accepted event times include `7:00 PM`, `7pm`, and `19:00`. Step lengths are who
 
 ## Tests
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer. The pages target Baseline 2024. WebMCP tools are an optional enhancement and are ignored by browsers that do not have them.
 
 ```bash
 node --test
